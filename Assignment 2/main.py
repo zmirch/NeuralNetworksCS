@@ -36,16 +36,24 @@ def adjust_weights(inputs, actual_labels, current_weights, current_bias):
     error_diff = LEARNING_RATE * (actual_labels - predicted_probs)  # Backward pass: Calculate error
 
     return inputs.T.dot(error_diff), error_diff.sum(axis=0)
-# Test the network after training, to evaluate performance on the test data
-def check_model_performance(test_data, test_labels, final_weights, final_bias):
-    num_correct = 0
-    for image, true_label in zip(test_data, test_labels):
-        predicted_probs = calculate_softmax(image.dot(final_weights) + final_bias)
-        if true_label[np.argmax(predicted_probs)] == 1:
-            num_correct += 1
-    accuracy = num_correct / len(test_data)
-    print(f"Model predicted {num_correct} out of {len(test_data)} test samples, \nwith an accuracy of {accuracy * 100:.2f}%")
-    return accuracy
+
+# Train the model on the training data
+def train_model(train_X, train_Y, weights, bias):
+    print("Training the model...")
+    for epoch in range(NUM_EPOCHS):
+
+        # shuffle training data to make sure network doesn't learn in a fixed order, which helps it generalize
+        pairs = list(zip(train_X, train_Y))
+        np.random.shuffle(pairs)
+        train_X, train_Y = zip(*pairs)
+
+        # Splits the train_X data into smaller chunks/batches, each containing BATCH_SIZE images
+        for batch_data, batch_labels in zip(np.array_split(train_X, dataset_len // BATCH_SIZE),
+                                            np.array_split(train_Y, dataset_len // BATCH_SIZE)):
+            # Update weights and bias of batch using gradient descent which is a method to reduce the error over time
+            weight_adjustment, bias_adjustment = adjust_weights(batch_data, batch_labels, weights, bias)
+            weights += weight_adjustment
+            bias += bias_adjustment
 
 if __name__ == '__main__':
     # Load MNIST data (True for training, False for testing)
@@ -65,25 +73,13 @@ if __name__ == '__main__':
 
     dataset_len = len(train_X)
 
-    # Training Loop
-    print("Training the model...")
-    for epoch in range(NUM_EPOCHS):
-        print(f"Epoch: {epoch + 1}/{NUM_EPOCHS}")
+    train_model(train_X, train_Y, weights, bias)
 
-        # shuffle training data to make sure network doesn't learn in a fixed order, which helps it generalize
-        pairs = list(zip(train_X, train_Y))
-        np.random.shuffle(pairs)
-        train_X, train_Y = zip(*pairs)
-
-        # Split data into batches and update weights/bias for each batch
-        for batch_data, batch_labels in zip(
-            np.array_split(train_X, dataset_len // BATCH_SIZE), # Splits the train_X data into smaller chunks/batches, each containing BATCH_SIZE images
-            np.array_split(train_Y, dataset_len // BATCH_SIZE)):
-
-            # Update weights and bias using gradient descent which is a method to reduce the error over time
-            weight_adjustment, bias_adjustment = adjust_weights(batch_data, batch_labels, weights, bias)
-            weights += weight_adjustment
-            bias += bias_adjustment
-
-    # Check model performance on test data
-    check_model_performance(test_X, test_Y, weights, bias)
+    # Test the model after training, to evaluate performance on the test data
+    num_correct = 0
+    for image, true_label in zip(test_X, test_Y):
+        predicted_probs = calculate_softmax(image.dot(weights) + bias)
+        if true_label[np.argmax(predicted_probs)] == 1:
+            num_correct += 1
+    print(
+        f"Model predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%")
