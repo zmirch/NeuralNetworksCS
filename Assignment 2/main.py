@@ -1,14 +1,6 @@
 import numpy as np
 from torchvision.datasets import MNIST # collection of 28x28 images of handwritten digits (0 through 9) that we'll use to train and test our neural network.
 
-# Settings of the neural network
-#NUM_EPOCHS = 150        # Number of times the model will go through the entire dataset
-LEARNING_RATE = 0.001   # Learning rate: how much the model adjusts its predictions each time it learns
-INPUT_LEN = 784   # Size of the input (28x28 pixels = 784)
-OUTPUT_SIZE = 10  # Number of digits to predict (0-9)
-BATCH_SIZE = 100  # Number of images for the model to process at once
-CLASS_COUNT = 10  # Total number of possible classes (digits 0-9)
-
 # Function to download and prepare the MNIST dataset (handwritten digits)
 def download_mnist(is_train: bool):
     dataset = MNIST(root='./data',
@@ -19,7 +11,7 @@ def download_mnist(is_train: bool):
     mnist_labels = []   # Stores one-hot encoded labels
     for image, label in dataset:
         mnist_data.append(image)
-        mnist_labels.append([int(item == label) for item in range(CLASS_COUNT)]) # One-hot encode labels
+        mnist_labels.append([int(item == label) for item in range(10)]) # One-hot encode labels
 
     return mnist_data, mnist_labels
 
@@ -27,15 +19,6 @@ def download_mnist(is_train: bool):
 def calculate_softmax(weighted_sum):
     exp_scores = np.power(np.e, weighted_sum, dtype=np.float64)
     return np.divide(exp_scores, exp_scores.sum())
-
-# Modify weights and bias using gradient descent
-def adjust_weights(inputs, actual_labels, current_weights, current_bias):
-    raw_output = inputs.dot(current_weights) + current_bias   # Forward pass: calculate raw scores
-    predicted_probs = np.array([calculate_softmax(score) for score in raw_output])  # Softmax probabilities
-
-    error_diff = LEARNING_RATE * (actual_labels - predicted_probs)  # Backward pass: Calculate error
-
-    return inputs.T.dot(error_diff), error_diff.sum(axis=0)
 
 # Train the model on the training data
 def train_model(train_X, train_Y, weights, bias):
@@ -47,11 +30,16 @@ def train_model(train_X, train_Y, weights, bias):
         np.random.shuffle(pairs)
         train_X, train_Y = zip(*pairs)
 
-        # Splits the train_X data into smaller chunks/batches, each containing BATCH_SIZE images
-        for batch_data, batch_labels in zip(np.array_split(train_X, dataset_len // BATCH_SIZE),
-                                            np.array_split(train_Y, dataset_len // BATCH_SIZE)):
-            # Update weights and bias of batch using gradient descent which is a method to reduce the error over time
-            weight_adjustment, bias_adjustment = adjust_weights(batch_data, batch_labels, weights, bias)
+        # Splits the train_X data into smaller chunks/batches, each containing 100 images
+        for batch_data, batch_labels in zip(np.array_split(train_X, dataset_len // 100), np.array_split(train_Y, dataset_len // 100)):
+
+            # Modify weights and bias of batch using gradient descent which is a method to reduce the error over time
+            raw_output = batch_data.dot(weights) + bias  # Forward pass: calculate raw scores
+            predicted = np.array([calculate_softmax(score) for score in raw_output])  # Softmax probabilities
+            error_diff = 0.01 * (batch_labels - predicted)  # Backward pass: Calculate error (0.01 is the learning rate)
+
+            weight_adjustment = batch_data.T.dot(error_diff)
+            bias_adjustment = error_diff.sum(axis=0)
             weights += weight_adjustment
             bias += bias_adjustment
 
@@ -68,8 +56,8 @@ if __name__ == '__main__':
     test_X = np.array(test_X, dtype=np.float64) / 255
 
     # Initialize weights and bias to zero
-    weights = np.zeros((INPUT_LEN, CLASS_COUNT), dtype=np.float64)
-    bias = np.zeros(CLASS_COUNT, dtype=np.float64)
+    weights = np.zeros((784, 10), dtype=np.float64)
+    bias = np.zeros(10, dtype=np.float64)
 
     dataset_len = len(train_X)
 
@@ -81,5 +69,4 @@ if __name__ == '__main__':
         predicted_probs = calculate_softmax(image.dot(weights) + bias)
         if true_label[np.argmax(predicted_probs)] == 1:
             num_correct += 1
-    print(
-        f"Model predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%")
+    print(f"Model predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%")
