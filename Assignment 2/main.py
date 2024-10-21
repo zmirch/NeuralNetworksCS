@@ -15,7 +15,7 @@ def download_mnist(is_train: bool):
 
     return mnist_data, mnist_labels
 
-# Softmax function to convert raw scores into probabilities of each digit
+# Softmax function to convert raw scores into probabilities of each digit (ex. [0.3, 0.6, 0.2, 0.3, 0.6 ... 0.5] etc)
 def calculate_softmax(weighted_sum):
     exp_scores = np.power(np.e, weighted_sum, dtype=np.float64)
     return np.divide(exp_scores, exp_scores.sum())
@@ -24,6 +24,14 @@ def calculate_softmax(weighted_sum):
 def train_model(train_X, train_Y, weights, bias):
     print("Training the model...")
     for epoch in range(NUM_EPOCHS):
+        if epoch == 1:
+            num_correct = 0
+            for image, true_label in zip(test_X, test_Y):
+                predicted_probs = calculate_softmax(image.dot(weights) + bias)
+                if true_label[np.argmax(predicted_probs)] == 1:
+                    num_correct += 1
+            print(
+                f"---------\nAfter the first epoch:\nModel predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%\n---------")
 
         # shuffle training data to make sure network doesn't learn in a fixed order, which helps it generalize
         pairs = list(zip(train_X, train_Y))
@@ -37,8 +45,11 @@ def train_model(train_X, train_Y, weights, bias):
             raw_output = batch_data.dot(weights) + bias  # Forward pass: calculate raw scores
             predicted = np.array([calculate_softmax(score) for score in raw_output])  # Softmax probabilities
             error_diff = 0.01 * (batch_labels - predicted)  # Backward pass: Calculate error (0.01 is the learning rate)
+                                                            # (in error_diff, each row represents a sample from the batch,
+                                                            # and each column is the digit 0 - 9)
 
-            weight_adjustment = batch_data.T.dot(error_diff)
+            weight_adjustment = batch_data.T.dot(error_diff)    # batch.T is transpose, which we then take dot product with our error,
+                                                                # propagating error through network and adjusting each weight based on how much it contributed to the error
             bias_adjustment = error_diff.sum(axis=0)
             weights += weight_adjustment
             bias += bias_adjustment
@@ -69,4 +80,4 @@ if __name__ == '__main__':
         predicted_probs = calculate_softmax(image.dot(weights) + bias)
         if true_label[np.argmax(predicted_probs)] == 1:
             num_correct += 1
-    print(f"Model predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%")
+    print(f"After the final epoch:\nModel predicted {num_correct} out of {len(test_X)} test samples, \nwith an accuracy of {(num_correct / len(test_X)) * 100:.2f}%")
