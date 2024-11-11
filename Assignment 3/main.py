@@ -95,8 +95,8 @@ if __name__ == '__main__':
     hidden_neurons = 100
     output_neurons = 10
 
-    w1 = np.random.randn(input_neurons, hidden_neurons) * np.sqrt(2 / input_neurons)  # He initialization
-    w2 = np.random.randn(hidden_neurons, output_neurons) * np.sqrt(2 / hidden_neurons)  # He initialization
+    w1 = np.random.randn(input_neurons, hidden_neurons) * np.sqrt(2 / (input_neurons + hidden_neurons)) # Xavier initialization
+    w2 = np.random.randn(hidden_neurons, output_neurons) * np.sqrt(2 / (hidden_neurons + output_neurons))
 
     b1 = np.random.randn(hidden_neurons)
     b2 = np.random.randn(output_neurons)
