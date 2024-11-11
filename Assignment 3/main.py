@@ -5,7 +5,7 @@ import time
 NUM_EPOCHS = 25
 LEARNING_RATE = 0.02
 LAMBDA_REG = 0.001  # L2 regularization parameter
-                    # if = 0, we have std cost func; the bigger -> the more bias, less variance
+                    # if = 0, we have standard cost function; the bigger, the more bias, less variance
 
 def download_mnist(is_train: bool):
     dataset = MNIST(root='./data',
@@ -30,74 +30,57 @@ def sigmoid_activation(x):
 def derivative_sigmoid(x):
     return sigmoid_activation(x) * (1 - sigmoid_activation(x))
 
-class NeuralNetwork:
-    def __init__(self, input_neurons=784, hidden_neurons=100, output_neurons=10, learning_rate=LEARNING_RATE, lambda_reg=LAMBDA_REG):
-        self.a2 = None
-        self.z2 = None
-        self.a1 = None
-        self.z1 = None
+def forward_propagation(x, w1, b1, w2, b2):
+    z1 = x.dot(w1) + b1
+    a1 = sigmoid_activation(z1)
+    z2 = a1.dot(w2) + b2
+    a2 = softmax_activation(z2)
+    return z1, a1, z2, a2
 
-        self.w1 = np.random.randn(input_neurons, hidden_neurons)
-        self.w2 = np.random.randn(hidden_neurons, output_neurons)
+def backpropagation(x, y, z1, a1, z2, a2, w1, w2, b1, b2, learning_rate, lambda_reg):
+    delta_output = y - a2
+    grad_weights_output = np.dot(a1.T, delta_output) + lambda_reg * w2  # applies L2 penalty
+    grad_bias_output = np.sum(delta_output, axis=0)  # bias gradient
 
-        self.b1 = np.random.randn(hidden_neurons)
-        self.b2 = np.random.randn(output_neurons)
+    delta_hidden = np.dot(delta_output, w2.T) * derivative_sigmoid(z1)
+    grad_weights_hidden = np.dot(x.T, delta_hidden) + lambda_reg * w1  # L2 penalty
+    grad_bias_hidden = np.sum(delta_hidden, axis=0)
 
-        self.learning_rate = learning_rate
-        self.lambda_reg = lambda_reg
+    # Update weights and biases
+    w1 += learning_rate * grad_weights_hidden
+    b1 += learning_rate * grad_bias_hidden
+    w2 += learning_rate * grad_weights_output
+    b2 += learning_rate * grad_bias_output
 
-    def forward_propagation(self, x):
-        self.z1 = x.dot(self.w1) + self.b1
-        self.a1 = sigmoid_activation(self.z1)
-        self.z2 = self.a1.dot(self.w2) + self.b2
-        self.a2 = softmax_activation(self.z2)
-        return self.a2
+    return w1, b1, w2, b2
 
-    def backpropagation(self, x, y):
+def calculate_accuracy(x, y, w1, b1, w2, b2):
+    _, _, _, predictions = forward_propagation(x, w1, b1, w2, b2)
+    predicted_labels = np.argmax(predictions, axis=1)
+    true_labels = np.argmax(y, axis=1)
+    return np.mean(predicted_labels == true_labels)
 
-        # ----Forward pass----
-        # Calculate linear combinations of inputs, and activated outputs
-        self.z1 = np.dot(x, self.w1) + self.b1
-        self.a1 = sigmoid_activation(self.z1)
-        self.z2 = np.dot(self.a1, self.w2) + self.b2
-        self.a2 = softmax_activation(self.z2)
+def train(x, y, w1, b1, w2, b2, learning_rate, lambda_reg, epochs=NUM_EPOCHS, batch_size=100):
+    for epoch in range(epochs):
+        print("-", end="")
 
-        # ----Backward pass----
-        delta_output = y - self.a2
-        grad_weights_output = np.dot(self.a1.T, delta_output) + self.lambda_reg * self.w2  # applies L2 penalty
-        grad_bias_output = np.sum(delta_output, axis=0) # bias gradient
+    print("")
+    for epoch in range(epochs):
+        print("*", end="")
 
-        delta_hidden = np.dot(delta_output, self.w2.T) * derivative_sigmoid(self.z1)
-        grad_weights_hidden = np.dot(x.T, delta_hidden) + self.lambda_reg * self.w1  # L2 penalty
-        grad_bias_hidden = np.sum(delta_hidden, axis=0)
+        shuffled_indices = np.random.permutation(x.shape[0])
+        x_shuffled, y_shuffled = x[shuffled_indices], y[shuffled_indices]  # shuffle
 
-        self.w1 += self.learning_rate * grad_weights_hidden
-        self.b1 += self.learning_rate * grad_bias_hidden
-        self.w2 += self.learning_rate * grad_weights_output
-        self.b2 += self.learning_rate * grad_bias_output
+        for i in range(0, x.shape[0], batch_size):
+            batch_x = x_shuffled[i:i + batch_size]
+            batch_y = y_shuffled[i:i + batch_size]
 
-    def train(self, x, y, epochs=NUM_EPOCHS, batch_size=100):
-        for epoch in range(epochs):
-            print("-", end="")
+            # Forward pass
+            z1, a1, z2, a2 = forward_propagation(batch_x, w1, b1, w2, b2)
 
-        print("")
-        for epoch in range(epochs):
-            print("*", end="")
-
-            shuffled_indices = np.random.permutation(x.shape[0])
-            x_shuffled, y_shuffled = x[shuffled_indices], y[shuffled_indices] # shuffle
-
-            for i in range(0, x.shape[0], batch_size):
-                batch_x = x_shuffled[i:i + batch_size]
-                batch_y = y_shuffled[i:i + batch_size]
-                self.backpropagation(batch_x, batch_y)
-        print("")
-
-    def calculate_accuracy(self, x, y):
-        predictions = self.forward_propagation(x)
-        predicted_labels = np.argmax(predictions, axis=1)
-        true_labels = np.argmax(y, axis=1)
-        return np.mean(predicted_labels == true_labels)
+            # Backpropagation and update weights
+            w1, b1, w2, b2 = backpropagation(batch_x, batch_y, z1, a1, z2, a2, w1, w2, b1, b2, learning_rate, lambda_reg)
+    print("")
 
 if __name__ == '__main__':
     training_data, training_labels = download_mnist(True)
@@ -108,11 +91,22 @@ if __name__ == '__main__':
     testing_data = np.array(testing_data, dtype=np.float64) / 255
     testing_labels = np.array(testing_labels)
 
-    MNIST_model = NeuralNetwork(learning_rate=LEARNING_RATE, lambda_reg=LAMBDA_REG)
+    input_neurons = 784
+    hidden_neurons = 100
+    output_neurons = 10
+
+    w1 = np.random.randn(input_neurons, hidden_neurons) * np.sqrt(2 / input_neurons)  # He initialization
+    w2 = np.random.randn(hidden_neurons, output_neurons) * np.sqrt(2 / hidden_neurons)  # He initialization
+
+    b1 = np.random.randn(hidden_neurons)
+    b2 = np.random.randn(output_neurons)
+
+    # Train the model
     begin_time = time.time()
-    MNIST_model.train(training_data, training_labels, epochs=NUM_EPOCHS, batch_size=100)
+    train(training_data, training_labels, w1, b1, w2, b2, learning_rate=LEARNING_RATE, lambda_reg=LAMBDA_REG, epochs=NUM_EPOCHS, batch_size=100)
     finish_time = time.time()
+
     print(f"For {NUM_EPOCHS} epochs:")
-    print(f"Training Accuracy: {MNIST_model.calculate_accuracy(training_data, training_labels) * 100}%")
-    print(f"Validation Accuracy: {MNIST_model.calculate_accuracy(testing_data, testing_labels) * 100}%")
+    print(f"Training Accuracy: {calculate_accuracy(training_data, training_labels, w1, b1, w2, b2) * 100}%")
+    print(f"Validation Accuracy: {calculate_accuracy(testing_data, testing_labels, w1, b1, w2, b2) * 100}%")
     print(f"Total duration: {(finish_time - begin_time) / 60} min")
